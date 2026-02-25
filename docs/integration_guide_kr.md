@@ -1,4 +1,4 @@
-# GhostPass iOS SDK — 개발자 문서
+# GhostPass SDK — 개발자 문서
 
 > **버전** 1.0 · **지원 플랫폼** iOS 14.0+ · **배포 형식** XCFramework  
 > **최종 업데이트** 2025년
