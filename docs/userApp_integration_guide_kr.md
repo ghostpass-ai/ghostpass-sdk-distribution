@@ -11,8 +11,8 @@
 2. [설치](#2-설치)
 3. [사전 준비](#3-사전-준비)
 4. [SDK 초기화](#4-sdk-초기화)
-5. [얼굴 등록 (Enrollment)](#5-얼굴-등록)
-6. [얼굴 인증 (Authentication)](#6-얼굴-인증)
+5. [안면 정보 등록](#5-안면-정보-등록)
+6. [안면 정보 삭제](#6-안면-정보-삭제)
 7. [에러 처리](#7-에러-처리)
 8. [FAQ](#8-faq)
 9. [API Reference](#9-api-reference)
@@ -242,7 +242,7 @@ GHOSTPASS_API_KEY = gp_prod_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 Swift 코드에서 읽어 SDK에 전달:
 ``` swift
 let apiKey = Bundle.main.object(forInfoDictionaryKey: "GhostPassAPIKey") as? String ?? ""
-GPSDK.shared.gpInit(apiKey: apiKey) { result in ... }
+try await GoPassSDK.shared.initialize(userOid: userOid, apiKey: apiKey)
 ```
 
 **방법 B — CI/CD 환경 변수 (GitHub Actions / Xcode Cloud)**
@@ -299,15 +299,23 @@ GPSDK.shared.gpInit(apiKey: apiKey) { result in ... }
 SDK를 사용하기 전 반드시 초기화를 완료해야 합니다. 초기화는 앱 실행 시점 **한 번만** 호출합니다.
 
 ### 4.1 API 형태 및 설명
+**request**
 
-| 항목 | 설명 | 예시 |
-|------|------|------|
-| userOid | Ghostpass SDK를 사용하기 위해 파트너사의 유저와 매핑된 id 값 | u12345 |
-| apiKey | `3. 사전 준비` 시 발급 받은 apiKey | gp_dev_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx |
+| 항목 | 타입 | 설명 | 예시 |
+|------|------|------|------|
+| apiKey | String | `3. 사전 준비` 시 발급 받은 apiKey | `gp_dev_xxxxxx...` |
+
+**response**
+
+| 타입 | 설명 | 예시 |
+|----|------|-----------|
+| String | SDK가 발급한 사용자 식별자. 유저가 파트너사 앱 재설치시 변경될 수 있습니다. | `"7612bd71dfc485cfaf375374ed57..."` |
+
+> 💡 **추가설명**: 반환된 String은 파트너사의 DB 내 유저와 직접 매핑을 진행하여야합니다.
    
 ``` swift
 // SDK 시스템 초기화
-public func initialize(userOid: String, apiKey: String) async throws
+public func initialize(apiKey: String) async throws -> String
 ```
 
 ### 4.2 예시
@@ -316,11 +324,10 @@ public func initialize(userOid: String, apiKey: String) async throws
 func startSDK() {
     Task {
         do {
-            try await GoPass.shared.initialize(userOid: "YOUR_USER_OID", apiKey: "YOUR_API_KEY")
+            let userId = try await GoPass.shared.initialize(apiKey: "YOUR_API_KEY")
+            /* 파트너사 유저와 매핑하는 로직 */
         } catch {
-            self.isSuccess = false
-            self.isProcessing = false
-            self.statusMessage = "에러 발생: \(error.localizedDescription) ❌"
+            print(GoPassSDK.SDKError.code, GoPassSDK.SDKError.message)
         }
     }
 }
@@ -328,174 +335,114 @@ func startSDK() {
 
 ---
 
-## 5. 안면 정보 등록 (작성중!!!!!)
+## 5. 안면 정보 등록
 
-안면 정보 등록은 카메라로 촬영한 이미지에서 안면 특징 벡터를 추출하여 기기의 Keychain에 저장하고 Beacon 탐지를 시작하는 과정입니다.
+카메라로 촬영한 이미지에서 안면 특징 벡터를 추출하여 기기의 Keychain에 저장하고 Beacon 탐지를 시작하는 과정입니다.
 
 ### 5.1 API 형태 및 설명
+**request**
 
 | 항목 | 설명 | 예시 |
 |------|------|------|
-| imageBytes | Ghostpass SDK를 사용하기 위해 파트너사의 유저와 매핑된 id 값 | u12345 |
+| imageBytes | 카메라 프레임(`CMSampleBuffer`)을 직접 전달하지 않으며, JPEG/PNG 데이터로 변환 후 전달해야 합니다. | `[0xFF, 0xD8, 0xFF, ...]` |
+
+**response**
+
+| 타입 | 값 | 권장 처리 |
+|----|------|-----------|
+| BioDataFrameStatus | saving | 카메라 캡처 유지, 다음 프레임 전달 |
+| | done | 저장 완료. 카메라 캡쳐 중지 |
    
 ``` swift
-// 생체 데이터 등록
+// 안면 데이터 등록
 public func registerBioData(imageBytes: [UInt8]) async throws -> BioDataFrameStatus
 ```
 
 ### 5.2 예시
+> 🗒️ **권장 사항**:  
+> 1. captureOutput 전용 Serial Queue 생성  
+>    AVCaptureVideoDataOutput의 샘플 버퍼 델리게이트는 반드시 별도의 Serial Queue를 지정해야 합니다. 메인 큐를 사용하면 UI 업데이트가 차단되고, Concurrent Queue를 사용하면 프레임이 순서 없이 처리되어 예기치 않은 동작이 발생할 수 있습니다. 전용 Serial Queue를 사용하면 프레임이 순서대로 처리되며 메인 스레드의 부하를 줄일 수 있습니다.
+> 2. Guard Flag(isProcessingFrame) 생성  
+>    카메라는 초당 30프레임 이상을 전송하므로, 이전 registerBioData 호출이 완료되기 전에 다음 프레임이 도착하면 호출이 중첩되어 콜스택에 누적됩니다. 이는 메모리 부하 및 예기치 않은 동작으로 이어질 수 있습니다.
+>    isProcessingFrame 플래그를 두어 처리 중인 동안 들어오는 프레임을 스킵하고, registerBioData 완료 후 반드시 false로 초기화해야 다음 프레임 처리가 가능합니다.
 
 
-### 5.2 얼굴 등록 호출
+``` swift
+private let videoQueue = DispatchQueue(label: "biodata.videoQueue", qos: .userInitiated)
+private var frameCount = 0
+private var isProcessingFrame = false // registerBioData 처리중일 때 frame을 무시하기 위한 flag
+private let frameInterval = 20
 
-```swift
-import GoPassSDK
+func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+    frameCount += 1
+    guard frameCount >= frameInterval else { return }  // 프레임 생성 속도가 매우 빨라 20프레임마다 처리 (파트너사의 선택)
+    frameCount = 0
 
-// 카메라 델리게이트 또는 이미지 피커에서 UIImage를 받은 후 호출
-func registerFace(with image: UIImage) {
-    GPSDK.shared.gpSaveLandmark(image: image) { result in
-        DispatchQueue.main.async {
-            switch result {
-            case .success:
-                print("✅ 얼굴 등록 성공")
-                self.showSuccessUI()
+    guard !isProcessingFrame else { return }           // 이전 요청 처리 중이면 스킵
+    guard let frameBytes = imageBytes(from: sampleBuffer) else { return }
 
-            case .failure(let error):
-                if let faceError = error as? GPFaceDetectionError {
-                    switch faceError {
-                    case .noFaceDetected:
-                        self.showGuide("화면에 얼굴을 위치시켜 주세요.")
-                    case .invalidFace:
-                        self.showGuide("정면을 바라봐 주세요.")
-                    case .livenessNotSatisfied:
-                        self.showGuide("실물 얼굴로 인증해 주세요.")
-                    case .featureNotExtracted:
-                        self.showGuide("얼굴 인식에 실패했습니다. 다시 시도해 주세요.")
-                    }
-                } else if let basicError = error as? GPBasicError {
-                    self.showError(basicError.errorDescription)
+    isProcessingFrame = true
+
+    Task { [weak self] in
+        guard let self else { return }
+        defer { self.videoQueue.async { self.isProcessingFrame = false } } // Task 종료 후 isProcessingFrame false 변경
+
+        do {
+            let status = try await GoPass.shared.registerBioData(imageBytes: frameBytes)
+            switch status {
+            case .saving:
+                break                                  // 계속 촬영
+
+            case .done:
+                DispatchQueue.main.async {
+                    self.stopCapture()
                 }
+
+            @unknown default:
+                break
             }
+        } catch let sdkError as GoPassSDK.SDKError {
+            DispatchQueue.main.async {
+                self.stopCapture()
+            }
+            print(sdkError.code, sdkError.message)
         }
     }
 }
-```
 
-### 5.3 등록 상태 확인
-
-```swift
-// 등록 여부 확인 (Keychain에 FVector가 저장되어 있는지 확인)
-if GPSDK.shared.gpIsExistLandmark {
-    print("✅ 등록된 얼굴 있음")
-} else {
-    print("⚠️ 등록된 얼굴 없음 — 등록 화면으로 이동")
-}
-
-// 등록된 사용자 ID 확인
-if let userOid = GPSDK.shared.userOid {
-    print("사용자 ID: \(userOid)")
+// MARK: - CMSampleBuffer → JPEG [UInt8]
+private func imageBytes(from sampleBuffer: CMSampleBuffer) -> [UInt8]? {
+    guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
+    let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        .oriented(.right)   // 전면 카메라 세로 방향 보정
+    let uiImage = UIImage(ciImage: ciImage)
+    guard let jpegData = uiImage.jpegData(compressionQuality: 0.9) else { return nil }
+    return [UInt8](jpegData)
 }
 ```
-
-### 5.4 얼굴 데이터 삭제 (재등록 / 탈퇴)
-
-```swift
-// 저장된 얼굴 특징 벡터를 Keychain에서 삭제
-let deleted = GPSDK.shared.gpDeleteLandmark()
-if deleted {
-    print("✅ 얼굴 데이터 삭제 완료")
-} else {
-    print("❌ 삭제 실패 — 이미 삭제되었거나 저장된 데이터 없음")
-}
-```
-
-### 5.5 Liveness 검증 기준
-
-SDK 내부에서 자동으로 수행되는 안티 스푸핑 검사 기준입니다.
-
-| 검사 항목 | 기준값 |
-|----------|--------|
-| 얼굴 각도 (Yaw/Pitch/Roll) | 각 ±15° 이내 |
-| 얼굴 위치 | 화면 중앙 ±20% 이내 |
-| 얼굴 크기 | 화면 너비의 10% ~ 80% |
-| Liveness Confidence | 0.9030 이상 |
-| 연속 사진 수집 | 내부 기준 충족 후 판정 |
-
 > 💡 **팁**: 등록 시 밝은 조명에서 정면을 바라보도록 UI 가이드를 제공하면 등록 성공률이 크게 향상됩니다.
 
 ---
 
-## 6. 얼굴 인증
+## 6. 안면 정보 삭제
 
-### 6.1 인증 흐름 개요
+로그아웃, 회원탈퇴, 유저의 선택과 같은 상황에 안면 정보를 삭제할 수 있습니다.
 
-```
-서버로부터 암호화된 secureData 수신
-               ↓
-      gpCompareLandmark() 호출
-               ↓
-     내부에서 복호화 후 특징 벡터 비교
-               ↓
-        ┌──────┴──────┐
-        ↓             ↓
-      성공            실패
-  transactionOid   GPBasicError
-    반환              반환
+### 6.1 API 형태 및 설명
+   
+``` swift
+// 안면 데이터 삭제
+public func removeBioData() async throws
 ```
 
-> 💡 **팁**: 서버에서 내려오는 `secureData`는 SDK 내부에서 복호화됩니다. 파트너 앱은 해당 데이터를 그대로 전달하기만 하면 됩니다.
-
-### 6.2 전체 연동 예시
-
-```swift
-import GoPassSDK
-
-class AuthViewController: UIViewController {
-
-    // 1단계: 등록 여부 확인
-    func checkEnrollment() {
-        guard GPSDK.shared.gpIsExistLandmark else {
-            navigateToEnrollment()
-            return
-        }
-        startAuthentication()
-    }
-
-    // 2단계: 서버로부터 secureData를 받아 인증 호출
-    func startAuthentication() {
-        fetchSecureDataFromServer { [weak self] secureData, hostLocationOid in
-            guard let self = self else { return }
-            self.authenticate(hostLocationOid: hostLocationOid, secureData: secureData)
-        }
-    }
-
-    // 3단계: SDK 인증 수행
-    private func authenticate(hostLocationOid: Int, secureData: String) {
-        // gpCompareLandmark는 내부 private이므로 서버 연동 래퍼를 통해 호출됩니다.
-        // 실제 연동 시 서버 API 응답의 secureData를 SDK에 전달하세요.
-    }
-
-    // 4단계: 인증 성공 처리
-    func handleAuthSuccess(transactionOid: String) {
-        DispatchQueue.main.async {
-            print("✅ 인증 성공 — 거래 ID: \(transactionOid)")
-            self.navigateToHome()
-        }
-    }
-
-    // 5단계: 인증 실패 처리
-    func handleAuthFailure(_ error: GPBasicError) {
-        DispatchQueue.main.async {
-            switch error {
-            case .missingLandmark:
-                self.showAlert("등록된 얼굴이 없습니다. 먼저 등록해 주세요.")
-            case .invalidLandmark:
-                self.showAlert("본인 인증에 실패했습니다. 다시 시도해 주세요.")
-            case .networkError:
-                self.showAlert("네트워크 오류가 발생했습니다. 연결을 확인해 주세요.")
-            default:
-                self.showAlert(error.errorDescription ?? "오류가 발생했습니다.")
-            }
+### 6.2 예시
+``` swift
+func removeBioData() {
+    Task {
+        do {
+            try await GoPass.shared.removeBioData()
+        } catch let sdkError as GoPassSDK.SDKError
+            print(sdkError.code, sdkError.description)
         }
     }
 }
@@ -504,8 +451,6 @@ class AuthViewController: UIViewController {
 ---
 
 ## 7. 에러 처리
-
-GhostPass SDK는 두 가지 에러 타입을 제공합니다.
 
 ### 7.1 GPFaceDetectionError — 얼굴 감지 관련
 
@@ -516,68 +461,11 @@ GhostPass SDK는 두 가지 에러 타입을 제공합니다.
 | `livenessNotSatisfied` | 라이브니스 검사 실패 | "사진이 아닌 실물 얼굴로 시도" 안내 |
 | `featureNotExtracted` | 얼굴 특징 벡터 추출 실패 | 재시도 유도 |
 
-### 7.2 GPBasicError — 일반 SDK 에러
-
-| 케이스 | 설명 | 권장 처리 |
-|--------|------|-----------|
-| `sdkInitFailed` | SDK 초기화 실패 | `gpInit()` 재호출 |
-| `missingLandmark` | 등록된 얼굴 없음 | 등록 화면으로 이동 |
-| `invalidLandmark` | 저장된 특징 벡터 유효하지 않음 | 재등록 유도 |
-| `saveLandmarkFailed` | Keychain 저장 실패 | 재시도, 권한 확인 |
-| `networkError` | 네트워크 통신 실패 | 연결 상태 확인 후 재시도 |
-| `invalidSessionError` | 세션 만료 | 재로그인 유도 |
-| `invalidDeviceIDError` | 기기 식별자 불일치 (중복 로그인) | 로그아웃 처리 후 재시도 |
-| `compareRecordNetwork` | 인증은 성공했으나 결과 저장 실패 | 재시도 (인증 자체는 성공) |
-| `parsingFailed` | 서버 응답 파싱 실패 | 서버 응답 형식 확인 |
-| `loginFailed` | 본인인증 실패 | 본인인증 재시도 |
-| `unknown` | 기타 알 수 없는 오류 | 로그 수집 후 고객지원 문의 |
 
 ### 7.3 에러 처리 예시 코드
 
 ```swift
-func handleError(_ error: Error) {
-    // SDK 에러 디버그 로그 출력 (공통 포맷)
-    if let gpError = error as? any GPError {
-        log(gpError) // [GPBasicError] op=… fn=… file:line reason=… recovery=…
-    }
 
-    // 타입별 분기 처리
-    if let faceError = error as? GPFaceDetectionError {
-        handleFaceError(faceError)
-    } else if let basicError = error as? GPBasicError {
-        handleBasicError(basicError)
-    } else {
-        showGenericError()
-    }
-}
-
-func handleFaceError(_ error: GPFaceDetectionError) {
-    switch error {
-    case .noFaceDetected:
-        showGuide("얼굴을 화면 가운데에 위치시켜 주세요.")
-    case .invalidFace:
-        showGuide("정면을 바라보고, 충분한 조명 아래에서 시도해 주세요.")
-    case .livenessNotSatisfied:
-        showGuide("이미지가 아닌 실물 얼굴로 인증해 주세요.")
-    case .featureNotExtracted:
-        showGuide("얼굴 인식에 실패했습니다. 다시 시도해 주세요.")
-    }
-}
-
-func handleBasicError(_ error: GPBasicError) {
-    switch error {
-    case .missingLandmark:
-        navigateToEnrollment()
-    case .networkError:
-        showRetryAlert("네트워크 연결을 확인해 주세요.")
-    case .invalidSessionError, .sessionError:
-        navigateToLogin()
-    case .invalidDeviceIDError:
-        logout()
-    default:
-        showAlert(error.errorDescription ?? "오류가 발생했습니다.")
-    }
-}
 ```
 
 ---
@@ -585,37 +473,17 @@ func handleBasicError(_ error: GPBasicError) {
 ## 8. FAQ
 
 **Q1. 비콘이 감지되지 않습니다.**  
-A. 현재 SDK는 비콘 기능이 비활성화 상태입니다(`gpActivateBeacon` 주석 처리됨). 비콘 연동이 필요한 경우 기술 지원으로 문의해 주세요.
-
----
-
-**Q2. 인증이 계속 실패합니다. 어떻게 디버깅하나요?**  
-A. 아래 순서로 확인하세요.
-
-1. `GPSDK.shared.gpIsExistLandmark`가 `true`인지 확인
-2. 등록 시와 동일한 조명·카메라 조건인지 확인
-3. `log(error)` 출력에서 `reason` 및 `recovery` 메시지 확인
-4. `invalidLandmark` 에러 시 → 재등록 유도 (`gpDeleteLandmark()` 후 재등록)
+A. 안면 인증 데이터가 저장되어 있는지 확인해주세요. 안면 정보가 없으면 비콘 감지를 시작하지 않습니다.
 
 ---
 
 **Q3. 시뮬레이터에서 빌드 오류가 발생합니다.**  
-A. `AlcheraFaceSDKPro`는 **arm64** 아키텍처만 지원하므로 시뮬레이터(x86_64 / arm64 시뮬레이터)에서는 동작하지 않습니다. 반드시 **실기기**에서 테스트하세요.
+A. `GoPassSDK`는 **arm64** 아키텍처만 지원하므로 시뮬레이터(x86_64 / arm64 시뮬레이터)에서는 동작하지 않습니다. 반드시 **실기기**에서 테스트하세요.
 
 ---
 
 **Q4. 얼굴 등록 후 앱을 삭제하면 어떻게 되나요?**  
-A. 얼굴 특징 벡터는 iOS Keychain에 저장됩니다. 앱을 삭제해도 Keychain 데이터는 유지될 수 있으므로, 재설치 후 `gpIsExistLandmark`를 확인하세요.
-
----
-
-**Q5. `compareRecordNetwork` 에러는 어떻게 처리해야 하나요?**  
-A. 이 에러는 **안면 비교 자체는 성공**했지만 서버에 결과를 저장하지 못한 상태입니다. 사용자에게 "인증에 성공했으나 기록 저장 중 오류가 발생했습니다. 다시 시도해 주세요."라고 안내하고 재시도를 유도하세요.
-
----
-
-**Q6. `invalidDeviceIDError`가 발생했습니다.**  
-A. 중복 로그인이 감지된 상태입니다. 현재 세션을 로그아웃 처리하고 사용자에게 다시 로그인을 요청하세요.
+A. 얼굴 특징 벡터는 iOS Keychain에 저장됩니다. 앱을 삭제해도 Keychain 데이터는 유지될 수 있으므로, 재설치 후 `removeBioData()`를 실행하면 삭제가 가능합니다.
 
 ---
 
@@ -623,7 +491,7 @@ A. 중복 로그인이 감지된 상태입니다. 현재 세션을 로그아웃 
 
 ### GPSDK
 
-`GPSDK`는 SDK의 메인 진입점으로, 싱글턴 패턴으로 제공됩니다.
+`GoPass`는 SDK의 메인 진입점으로, 싱글턴 패턴으로 제공됩니다.
 
 ```swift
 public class GoPass {
