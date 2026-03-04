@@ -2,7 +2,8 @@
 import PackageDescription
 
 let package = Package(
-    name: "GoPassSDK",
+    // name: "GoPassSDK",
+    name: "ghostpass-sdk-distribution",
     platforms: [.iOS(.v14)],
     products: [
         .library(name: "GoPassSDK", targets: ["GoPassSDK"])
