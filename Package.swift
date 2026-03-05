@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "GoPassSDK",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v15)],
     products: [
         .library(name: "GoPassSDK", targets: ["GoPassSDK"])
     ],
