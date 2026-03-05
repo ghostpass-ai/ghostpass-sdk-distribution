@@ -2,8 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    // name: "GoPassSDK",
-    name: "ghostpass-sdk-distribution",
+    name: "GoPassSDK",
     platforms: [.iOS(.v14)],
     products: [
         .library(name: "GoPassSDK", targets: ["GoPassSDK"])
@@ -17,7 +16,7 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "GoPassSDKBinary",
-            url: "https://api.github.com/repos/ghostpass-ai/ghostpass-sdk-distribution/releases/assets/366435406",
+            url: "https://github.com/ghostpass-ai/ghostpass-sdk-distribution/releases/download/1.0.0/GoPassSDK.xcframework.zip",
             checksum: "836c7e41d70aa71ad8f14897a3845c153cc431f4483799613c71320c929cc73f"
         ),
         .target(
