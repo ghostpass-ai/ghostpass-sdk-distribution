@@ -1,1 +1,1 @@
-@_exported import GoPassSDKBinary
+// stub
