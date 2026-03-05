@@ -1,1 +1,1 @@
-@_exported import GoPassAuth
+// stub
