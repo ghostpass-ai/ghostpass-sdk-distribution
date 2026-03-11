@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = 'GoPassSDK'
-  s.version      = '0.1.5'
+  s.version      = '0.1.6'
   s.summary      = 'GoPass SDK for iOS'
   s.homepage     = 'https://github.com/ghostpass-ai/ghostpass-sdk-distribution'
   s.license      = { :type => 'Commercial', :text => 'Copyright ghostpass-ai. All rights reserved.' }
@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.swift_versions = ['5.9']
 
   s.source = {
-    :http => 'https://github.com/ghostpass-ai/ghostpass-sdk-distribution/releases/download/0.1.5/GoPassSDK.xcframework.zip'
+    :http => 'https://github.com/ghostpass-ai/ghostpass-sdk-distribution/releases/download/0.1.6/GoPassSDK.xcframework.zip'
   }
 
   s.vendored_frameworks = 'GoPassSDK.xcframework'
