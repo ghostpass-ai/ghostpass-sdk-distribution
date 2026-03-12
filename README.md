@@ -106,7 +106,7 @@ pod install
 
 | 문서 | 내용 |
 |------|------|
-| [연동 가이드](docs/integration_guide_kr.md) | 설치, 초기화, 얼굴 등록·인증, API Reference |
+| [연동 가이드](docs/userApp_integration_guide.md) | 설치, 초기화, 얼굴 등록·인증, API Reference |
 | [에러 코드](docs/error_codes.md) | 에러 타입별 설명 및 처리 방법 |
 
 ---
