@@ -1,9 +1,16 @@
 # GhostPass SDK — Distribution Repository
 
-> **지원 플랫폼** iOS 14.0+ · Android (지원 예정)  
-> **배포 방식** Private GitHub Repository
+**지원 플랫폼**
+| 플랫폼 | 최소 버전 |
+|------|------|
+| iOS | 15.0+ |
+| Android | 지원 예정 |
 
-이 저장소는 **GhostPass 파트너사**에 한해 접근이 허용된 비공개 배포 저장소입니다.
+**배포 방식**
+| 플랫폼 | 최소 버전 |
+|------|------|
+| iOS | SPM (Swift Package Manager) · CocoaPods |
+| Android | 지원 예정 |
 
 ---
 
@@ -23,57 +30,75 @@ ghostpass-sdk-distribution/
 
 ---
 
-## 빠른 시작 (iOS)
+## 서비스 이용 방법 (공통)
 
-### 1. 저장소 접근 권한 요청
+### 1. 유저앱
 
-GhostPass 담당자에게 아래 정보를 전달하여 GitHub 초대를 요청하세요.
+**1.1. 저장소 접근 권한 요청**
+
+GhostPass 담당자에게 아래 정보를 전달해 주세요.
 
 - GitHub 계정 이메일 (또는 username)
 - 회사명 / 서비스명 / Bundle ID
 - 담당자 이메일
 
-### 2. SDK 설치 (Swift Package Manager)
+**1.2. API Key 발급**
 
-1. Xcode → **File → Add Package Dependencies...**
-2. URL 입력:
+GhostPass 담당자에게 서비스 등록을 요청하면 **API Key**를 발급해 드립니다.
+
+### 2. 키오스크
+
+---
+
+## iOS 설치
+> iOS는 현재 유저앱 SDK만 제공됩니다.
+
+### Swift Package Manager (SPM)
+
+**1.** Xcode → **File → Add Package Dependencies...**
+
+**2.** 검색창에 아래 URL을 입력합니다.
 
 ```
 https://github.com/ghostpass-ai/ghostpass-sdk-distribution
 ```
 
-3. `GoPassSDK` 라이브러리를 앱 타깃에 추가
+**3.** 버전 규칙을 선택하고 **Add Package** 를 클릭합니다.
 
-### 3. API Key 발급
+**4.** `GoPassSDK` 라이브러리를 앱 타깃에 추가합니다.
 
-GhostPass 담당자에게 서비스 등록을 요청하면 **API Key**를 발급해 드립니다.
+---
 
-### 4. SDK 초기화
+### CocoaPods
 
-```swift
-import GoPassSDK
+**1.** `Podfile` 에 아래 내용을 추가합니다.
 
-GPSDK.shared.gpInit(apiKey: "YOUR_API_KEY") { result in
-    switch result {
-    case .success: print("✅ SDK 준비 완료")
-    case .failure(let error): print("❌ \(error.errorDescription ?? "")")
-    }
-}
+```ruby
+target 'YourApp' do
+use_frameworks!
+pod 'GoPassSDK', '~> {VERSION}'
+end
 ```
 
-### 5. 얼굴 등록
+**2.** 터미널에서 설치합니다.
 
-```swift
-GPSDK.shared.gpSaveLandmark(image: cameraImage) { result in
-    switch result {
-    case .success: print("✅ 얼굴 등록 완료")
-    case .failure(let error): print("❌ \(error.localizedDescription)")
-    }
-}
+```bash
+pod install
 ```
 
-그 이후의 **인증은 SDK가 자동으로 처리**합니다.  
-키오스크 비콘 감지 시 자동으로 인증 세션이 수립되고, 결과는 `delegate` 콜백으로 전달됩니다.
+**3.** 이후 `.xcworkspace` 파일로 프로젝트를 엽니다.
+
+**4.** Xcode → **Target → Build Settings → Other Linker Flags** 에 `$(inherited)` 가 포함되어 있는지 확인합니다.
+> `$(inherited)` 가 없으면 CocoaPods 의존성이 링커에 정상적으로 전달되지 않아 빌드 에러가 발생할 수 있습니다.
+
+---
+
+## iOS 사용 방법
+[연동 가이드](docs/integration_guide_kr.md)를 참고해주세요.
+
+---
+
+## Android 설치
 
 ---
 
