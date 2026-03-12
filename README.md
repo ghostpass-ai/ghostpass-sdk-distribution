@@ -94,7 +94,7 @@ pod install
 ---
 
 ## iOS 사용 방법
-[연동 가이드](docs/integration_guide_kr.md)를 참고해주세요.
+[연동 가이드]([docs/integration_guide_kr.md](https://github.com/ghostpass-ai/ghostpass-sdk-distribution/blob/main/docs/userApp_integration_guide_kr.md))를 참고해주세요.
 
 ---
 
