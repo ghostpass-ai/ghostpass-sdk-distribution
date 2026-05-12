@@ -11,7 +11,7 @@ let package = Package(
       .binaryTarget(
           name: "GoPassSDK",
           url: "https://github.com/ghostpass-ai/ghostpass-sdk-distribution/releases/download/1.0.2/GoPassSDK.xcframework.zip",
-          checksum: "40953012f5df75135fe4795d30baaf15cc4efb2fb84d7e5c91cd9bcdb18f77a6"
+          checksum: "0139b020831c29d8bc8f563310b05ce7f2ad751c84f1c3f607dcdb76135efd78"
       )
   ]
 )
